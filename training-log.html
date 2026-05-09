@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Training Log</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f0f0f0; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    select { -webkit-appearance: none; appearance: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const PRESET_MENUS = {
+      "Day1 胸・肩": [
+        { name: "DBフラットベンチプレス", defaultWeight: 25, defaultReps: 8, targetSets: 4 },
+        { name: "DBインクラインプレス", defaultWeight: 20, defaultReps: 8, targetSets: 3 },
+        { name: "DBフライ（フラット）", defaultWeight: 15, defaultReps: 10, targetSets: 3 },
+        { name: "DBサイドレイズ", defaultWeight: 9, defaultReps: 12, targetSets: 3 },
+      ],
+      "Day2 背中・二頭": [
+        { name: "DBデッドリフト", defaultWeight: 30, defaultReps: 10, targetSets: 3 },
+        { name: "DBベントオーバーロウ", defaultWeight: 25, defaultReps: 8, targetSets: 5 },
+        { name: "DBワンハンドロウ", defaultWeight: 28, defaultReps: 8, targetSets: 3 },
+        { name: "DBカール", defaultWeight: 15, defaultReps: 10, targetSets: 3 },
+        { name: "DBハンマーカール", defaultWeight: 15, defaultReps: 12, targetSets: 2 },
+      ],
+      "Day4 胸・肩": [
+        { name: "DBデクラインプレス", defaultWeight: 25, defaultReps: 8, targetSets: 4 },
+        { name: "DBインクラインフライ", defaultWeight: 14, defaultReps: 10, targetSets: 3 },
+        { name: "DBナローベンチプレス", defaultWeight: 20, defaultReps: 10, targetSets: 3 },
+        { name: "DBアップライトロウ", defaultWeight: 11, defaultReps: 12, targetSets: 3 },
+      ],
+      "Day5 脚・腹": [
+        { name: "DBゴブレットスクワット", defaultWeight: 32, defaultReps: 10, targetSets: 4 },
+        { name: "DBブルガリアンスクワット", defaultWeight: 20, defaultReps: 10, targetSets: 3 },
+        { name: "クランチ", defaultWeight: 0, defaultReps: 20, targetSets: 3 },
+        { name: "レッグレイズ", defaultWeight: 0, defaultReps: 15, targetSets: 3 },
+      ],
+    };
+
+    const WEIGHT_OPTIONS = [0,5,7,9,11,13,15,18,20,22,25,27,29,32,34,36,38,40];
+    const REPS_OPTIONS = Array.from({ length: 25 }, (_, i) => i + 1);
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return `${d.getMonth()+1}/${d.getDate()}(${["日","月","火","水","木","金","土"][d.getDay()]})`;
+    }
+
+    function getTodayKey() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    // ── HOME ─────────────────────────────────────────────────────────────────
+
+    function HomeScreen({ logs, onStart, onViewHistory }) {
+      const today = getTodayKey();
+      const todayLog = logs[today];
+      const allDates = Object.keys(logs).sort((a, b) => b.localeCompare(a));
+      const lastDate = allDates.find(d => d !== today);
+      const lastSession = lastDate ? logs[lastDate] : null;
+
+      return (
+        <div style={s.screen}>
+          <div style={s.hero}>
+            <div style={s.heroLabel}>TRAINING LOG</div>
+            <div style={s.heroDate}>{formatDate(today)}</div>
+          </div>
+
+          {todayLog && (
+            <div style={s.todayCard}>
+              <div style={s.todayCardLabel}>今日のセッション記録済み</div>
+              <div style={s.todayCardDay}>{todayLog.day}</div>
+              <div style={s.todayCardStats}>
+                {todayLog.exercises.length}種目 · {todayLog.exercises.reduce((a,e) => a+e.sets.length, 0)}セット
+              </div>
+              <button style={s.btnSecondary} onClick={() => onStart(todayLog.day, true)}>
+                今日の記録を編集
+              </button>
+            </div>
+          )}
+
+          {!todayLog && (
+            <div style={s.dayGrid}>
+              {Object.keys(PRESET_MENUS).map(day => (
+                <button key={day} style={s.dayBtn} onClick={() => onStart(day, false)}>
+                  <span>{day}</span>
+                  <span style={{color:"#e8ff00"}}>→</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {lastSession && (
+            <div style={s.lastSession}>
+              <div style={s.lastSessionTitle}>前回のセッション</div>
+              <div style={s.lastSessionDay}>
+                {lastSession.day}
+                <span style={s.lastSessionDate}>{formatDate(lastDate)}</span>
+              </div>
+              {lastSession.exercises.map(ex => (
+                <div key={ex.name} style={{marginBottom:8}}>
+                  <span style={s.lastExName}>{ex.name}</span>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                    {ex.sets.map((set, i) => (
+                      <span key={i} style={s.chip}>
+                        {set.weight > 0 ? `${set.weight}kg` : "自重"}×{set.reps}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button style={s.historyBtn} onClick={onViewHistory}>
+            📋 履歴を見る
+          </button>
+        </div>
+      );
+    }
+
+    // ── SESSION ───────────────────────────────────────────────────────────────
+
+    function SessionScreen({ day, existingLog, allLogs, onSave, onBack }) {
+      const presets = PRESET_MENUS[day];
+
+      const initExercises = () => {
+        if (existingLog) return existingLog.exercises;
+        const pastLog = Object.values(allLogs)
+          .filter(l => l.day === day)
+          .slice(-1)[0];
+        return presets.map(p => {
+          const pastEx = pastLog?.exercises.find(e => e.name === p.name);
+          const lastSet = pastEx?.sets[pastEx.sets.length - 1];
+          return {
+            name: p.name,
+            targetSets: p.targetSets,
+            prevSets: pastEx ? pastEx.sets : null,
+            sets: [{ weight: lastSet?.weight ?? p.defaultWeight, reps: lastSet?.reps ?? p.defaultReps }],
+          };
+        });
+      };
+
+      const [exercises, setExercises] = useState(initExercises);
+      const [activeEx, setActiveEx] = useState(0);
+      const [saved, setSaved] = useState(false);
+
+      const updateSet = (exIdx, setIdx, field, val) => {
+        setExercises(prev => {
+          const next = prev.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }));
+          next[exIdx].sets[setIdx][field] = val;
+          return next;
+        });
+      };
+
+      const addSet = (exIdx) => {
+        setExercises(prev => {
+          const next = prev.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }));
+          const last = next[exIdx].sets[next[exIdx].sets.length - 1];
+          next[exIdx].sets.push({ ...last });
+          return next;
+        });
+      };
+
+      const removeSet = (exIdx, setIdx) => {
+        setExercises(prev => {
+          const next = prev.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }));
+          if (next[exIdx].sets.length > 1) next[exIdx].sets.splice(setIdx, 1);
+          return next;
+        });
+      };
+
+      const handleSave = () => {
+        onSave({ day, exercises });
+        setSaved(true);
+        setTimeout(() => {
+          setSaved(false);
+          onBack();
+        }, 800);
+      };
+
+      const ex = exercises[activeEx];
+
+      return (
+        <div style={s.screen}>
+          <div style={s.sessionHeader}>
+            <button style={s.backBtn} onClick={onBack}>‹</button>
+            <div style={s.sessionTitle}>{day}</div>
+            <button
+              style={{ ...s.saveBtn, ...(saved ? {background:"#4caf50",color:"#fff"} : {}) }}
+              onClick={handleSave}
+            >
+              {saved ? "✓" : "保存"}
+            </button>
+          </div>
+
+          <div style={s.exTabs}>
+            {exercises.map((_, i) => (
+              <button
+                key={i}
+                style={{ ...s.exTab, ...(i === activeEx ? s.exTabActive : {}) }}
+                onClick={() => setActiveEx(i)}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          <div style={{padding:"4px 16px 4px",display:"flex",alignItems:"baseline",gap:10}}>
+            <div style={s.exName}>{ex.name}</div>
+            {ex.targetSets && (
+              <div style={{fontSize:12,color:"#e8ff00",fontWeight:600}}>目標 {ex.targetSets} セット</div>
+            )}
+          </div>
+
+          {ex.prevSets && ex.prevSets.length > 0 && (
+            <div style={{padding:"0 16px 12px",fontSize:12,color:"#666"}}>
+              <span>前回：</span>
+              {ex.prevSets.map((ps, i) => (
+                <span key={i}>
+                  {i > 0 && <span style={{color:"#333"}}> / </span>}
+                  <span style={{color:"#aaa",fontWeight:700}}>
+                    {ps.weight > 0 ? `${ps.weight}kg` : "自重"}×{ps.reps}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div style={{padding:"0 16px"}}>
+            {ex.sets.map((set, si) => (
+              <div key={si} style={s.setRow}>
+                <div style={{fontSize:10,letterSpacing:"0.15em",color:"#e8ff00",fontWeight:700,marginBottom:8}}>
+                  SET {si + 1}
+                </div>
+                <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:11,color:"#666",marginBottom:4}}>重量 (kg)</div>
+                    <select
+                      style={s.select}
+                      value={set.weight}
+                      onChange={e => updateSet(activeEx, si, "weight", Number(e.target.value))}
+                    >
+                      {WEIGHT_OPTIONS.map(w => (
+                        <option key={w} value={w}>{w === 0 ? "自重" : `${w}kg`}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:11,color:"#666",marginBottom:4}}>回数</div>
+                    <select
+                      style={s.select}
+                      value={set.reps}
+                      onChange={e => updateSet(activeEx, si, "reps", Number(e.target.value))}
+                    >
+                      {REPS_OPTIONS.map(r => (
+                        <option key={r} value={r}>{r}回</option>
+                      ))}
+                    </select>
+                  </div>
+                  {ex.sets.length > 1 && (
+                    <button style={s.removeSetBtn} onClick={() => removeSet(activeEx, si)}>✕</button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button style={s.addSetBtn} onClick={() => addSet(activeEx)}>
+              ＋ セット追加
+            </button>
+          </div>
+
+          <div style={s.summary}>
+            {exercises.map((ex, i) => (
+              <div
+                key={i}
+                style={{ ...s.summaryRow, ...(i === activeEx ? s.summaryRowActive : {}) }}
+                onClick={() => setActiveEx(i)}
+              >
+                <span style={{fontSize:13,color:"#bbb"}}>{ex.name}</span>
+                <span style={{fontSize:12,color:"#666"}}>
+                  {ex.sets.length}{ex.targetSets ? `/${ex.targetSets}` : ""}セット
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── HISTORY ───────────────────────────────────────────────────────────────
+
+    function HistoryScreen({ logs, onBack }) {
+      const dates = Object.keys(logs).sort((a, b) => b.localeCompare(a));
+
+      return (
+        <div style={s.screen}>
+          <div style={s.sessionHeader}>
+            <button style={s.backBtn} onClick={onBack}>‹</button>
+            <div style={s.sessionTitle}>履歴</div>
+            <div style={{width:48}} />
+          </div>
+          {dates.length === 0 ? (
+            <div style={{textAlign:"center",color:"#555",marginTop:60,fontSize:15}}>まだ記録がありません</div>
+          ) : (
+            <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:12}}>
+              {dates.map(date => {
+                const log = logs[date];
+                return (
+                  <div key={date} style={s.historyCard}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,paddingBottom:10,borderBottom:"1px solid #1e1e1e"}}>
+                      <span style={{fontSize:15,fontWeight:700}}>{log.day}</span>
+                      <span style={{fontSize:12,color:"#666"}}>{formatDate(date)}</span>
+                    </div>
+                    {log.exercises.map(ex => (
+                      <div key={ex.name} style={{marginBottom:10}}>
+                        <div style={{fontSize:12,color:"#888",marginBottom:4}}>{ex.name}</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                          {ex.sets.map((set, i) => (
+                            <span key={i} style={s.chip}>
+                              {set.weight > 0 ? `${set.weight}kg` : "自重"}×{set.reps}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── APP ───────────────────────────────────────────────────────────────────
+
+    function App() {
+      const [screen, setScreen] = useState("home");
+      const [selectedDay, setSelectedDay] = useState(null);
+      const [editingToday, setEditingToday] = useState(false);
+      const [logs, setLogs] = useState({});
+      const [fileLoaded, setFileLoaded] = useState(false);
+
+      const saveLogs = (newLogs) => {
+        setLogs(newLogs);
+        // 自動でJSONダウンロード
+        const blob = new Blob([JSON.stringify(newLogs, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "training-log.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const loadFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            setLogs(data);
+            setFileLoaded(true);
+          } catch {
+            alert("ファイルの読み込みに失敗しました");
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      const handleStart = (day, editing) => {
+        setSelectedDay(day);
+        setEditingToday(editing);
+        setScreen("session");
+      };
+
+      const handleSave = (sessionData) => {
+        const today = getTodayKey();
+        saveLogs({ ...logs, [today]: sessionData });
+      };
+
+      const todayLog = logs[getTodayKey()];
+
+      return (
+        <div style={{fontFamily:"'Helvetica Neue',Arial,sans-serif",background:"#0a0a0a",minHeight:"100vh",color:"#f0f0f0",maxWidth:430,margin:"0 auto"}}>
+          {screen === "home" && !fileLoaded && (
+            <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:24}}>
+              <div style={{fontSize:11,letterSpacing:"0.25em",color:"#e8ff00",fontWeight:700}}>TRAINING LOG</div>
+              <div style={{fontSize:22,fontWeight:800,textAlign:"center"}}>ようこそ</div>
+              <div style={{fontSize:13,color:"#666",textAlign:"center",lineHeight:1.7}}>
+                前回のデータがある場合は<br/>JSONファイルを読み込んでください
+              </div>
+              <label style={{background:"#e8ff00",borderRadius:10,padding:"14px 28px",fontSize:14,fontWeight:700,color:"#000",cursor:"pointer",display:"block"}}>
+                📂 データを読み込む
+                <input type="file" accept=".json" onChange={loadFile} style={{display:"none"}} />
+              </label>
+              <button
+                style={{background:"transparent",border:"1px solid #2a2a2a",borderRadius:10,padding:"14px 28px",fontSize:14,color:"#666",cursor:"pointer"}}
+                onClick={() => setFileLoaded(true)}
+              >
+                新規スタート
+              </button>
+            </div>
+          )}
+          {screen === "home" && fileLoaded && (
+            <HomeScreen logs={logs} onStart={handleStart} onViewHistory={() => setScreen("history")} />
+          )}
+          {screen === "session" && (
+            <SessionScreen
+              day={selectedDay}
+              existingLog={editingToday ? todayLog : null}
+              allLogs={logs}
+              onSave={handleSave}
+              onBack={() => setScreen("home")}
+            />
+          )}
+          {screen === "history" && (
+            <HistoryScreen logs={logs} onBack={() => setScreen("home")} />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+    // ── STYLES ────────────────────────────────────────────────────────────────
+
+    const s = {
+      screen: { paddingBottom: 80, minHeight: "100vh" },
+      hero: { background: "linear-gradient(135deg,#1a1a1a 0%,#111 100%)", padding: "40px 20px 28px", borderBottom: "1px solid #222" },
+      heroLabel: { fontSize: 11, letterSpacing: "0.25em", color: "#e8ff00", fontWeight: 700, marginBottom: 8 },
+      heroDate: { fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" },
+      todayCard: { margin: "16px", background: "#141414", border: "1px solid #2a2a2a", borderRadius: 12, padding: "20px" },
+      todayCardLabel: { fontSize: 11, color: "#e8ff00", letterSpacing: "0.1em", marginBottom: 6 },
+      todayCardDay: { fontSize: 20, fontWeight: 700, marginBottom: 4 },
+      todayCardStats: { fontSize: 13, color: "#888", marginBottom: 16 },
+      dayGrid: { padding: "16px", display: "flex", flexDirection: "column", gap: 10 },
+      dayBtn: { background: "#141414", border: "1px solid #2a2a2a", borderRadius: 12, padding: "18px 20px", color: "#f0f0f0", fontSize: 15, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", textAlign: "left", width: "100%" },
+      lastSession: { margin: "0 16px 16px", background: "#0e0e0e", border: "1px solid #1e1e1e", borderRadius: 12, padding: "16px" },
+      lastSessionTitle: { fontSize: 11, color: "#666", letterSpacing: "0.1em", marginBottom: 8 },
+      lastSessionDay: { fontSize: 14, fontWeight: 700, marginBottom: 10 },
+      lastSessionDate: { fontSize: 12, color: "#888", fontWeight: 400, marginLeft: 8 },
+      lastExName: { fontSize: 12, color: "#aaa", display: "block", marginBottom: 4 },
+      chip: { background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#ddd" },
+      historyBtn: { display: "block", margin: "0 16px", width: "calc(100% - 32px)", background: "transparent", border: "1px solid #2a2a2a", borderRadius: 12, padding: "14px", color: "#888", fontSize: 14, cursor: "pointer" },
+      sessionHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 12px", borderBottom: "1px solid #1e1e1e", position: "sticky", top: 0, background: "#0a0a0a", zIndex: 10 },
+      backBtn: { background: "transparent", border: "none", color: "#e8ff00", fontSize: 28, cursor: "pointer", padding: "0 8px", lineHeight: 1 },
+      sessionTitle: { fontSize: 15, fontWeight: 700, letterSpacing: "0.02em" },
+      saveBtn: { background: "#e8ff00", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: "#000", cursor: "pointer", minWidth: 48 },
+      exTabs: { display: "flex", gap: 8, padding: "12px 16px", overflowX: "auto" },
+      exTab: { minWidth: 36, height: 36, borderRadius: "50%", border: "1px solid #2a2a2a", background: "#141414", color: "#888", fontSize: 13, fontWeight: 700, cursor: "pointer" },
+      exTabActive: { background: "#e8ff00", color: "#000", border: "none" },
+      exName: { fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em" },
+      setRow: { background: "#141414", border: "1px solid #1e1e1e", borderRadius: 10, padding: "12px 14px", marginBottom: 8 },
+      select: { width: "100%", background: "#0e0e0e", border: "1px solid #2a2a2a", borderRadius: 8, color: "#f0f0f0", fontSize: 16, padding: "8px 10px" },
+      removeSetBtn: { background: "transparent", border: "1px solid #2a2a2a", borderRadius: 8, color: "#555", fontSize: 12, padding: "8px 10px", cursor: "pointer", height: 38 },
+      addSetBtn: { width: "100%", background: "transparent", border: "1px dashed #2a2a2a", borderRadius: 10, color: "#666", fontSize: 14, padding: "12px", cursor: "pointer", marginTop: 4 },
+      summary: { margin: "16px", background: "#0e0e0e", border: "1px solid #1e1e1e", borderRadius: 10, overflow: "hidden" },
+      summaryRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid #1a1a1a", cursor: "pointer" },
+      summaryRowActive: { background: "#1a1a1a", borderLeft: "3px solid #e8ff00" },
+      historyCard: { background: "#141414", border: "1px solid #1e1e1e", borderRadius: 12, padding: "16px" },
+      btnSecondary: { background: "transparent", border: "1px solid #2a2a2a", borderRadius: 8, color: "#aaa", fontSize: 13, padding: "8px 14px", cursor: "pointer", width: "100%" },
+    };
+  </script>
+</body>
+</html>
