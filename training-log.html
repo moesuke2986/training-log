@@ -63,18 +63,17 @@
 
     // ── HOME ─────────────────────────────────────────────────────────────────
 
-    function HomeScreen({ logs, onStart, onViewHistory }) {
+    function HomeScreen({ logs, todayLogs, onStart, onViewHistory }) {
       const today = getTodayKey();
-      const todayLog = logs[today];
       const allDates = Object.keys(logs).sort((a, b) => b.localeCompare(a));
       const lastDate = allDates.find(d => d !== today);
-      const lastSession = lastDate ? logs[lastDate] : null;
+      const lastDayLogs = lastDate ? logs[lastDate] : null;
 
       return (
         <div style={s.screen}>
           <div style={s.hero}>
             <div style={s.heroLabel}>TRAINING LOG</div>
-            <div style={{fontSize:10,color:"#555",marginTop:4}}>v0.4.1-test</div>
+            <div style={{fontSize:10,color:"#555",marginTop:4}}>v0.5.0</div>
             <div style={s.heroDate}>{formatDate(today)}</div>
           </div>
 
@@ -87,23 +86,24 @@
             ))}
           </div>
 
-          {lastSession && (
+          {lastDayLogs && (
             <div style={s.lastSession}>
-              <div style={s.lastSessionTitle}>前回のセッション</div>
-              <div style={s.lastSessionDay}>
-                {lastSession.day}
-                <span style={s.lastSessionDate}>{formatDate(lastDate)}</span>
-              </div>
-              {lastSession.exercises.map(ex => (
-                <div key={ex.name} style={{marginBottom:8}}>
-                  <span style={s.lastExName}>{ex.name}</span>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                    {ex.sets.map((set, i) => (
-                      <span key={i} style={s.chip}>
-                        {set.weight > 0 ? `${set.weight}kg` : "自重"}×{set.reps}
-                      </span>
-                    ))}
-                  </div>
+              <div style={s.lastSessionTitle}>前回のセッション（{formatDate(lastDate)}）</div>
+              {Object.entries(lastDayLogs).map(([day, data]) => (
+                <div key={day} style={{marginBottom:12}}>
+                  <div style={s.lastSessionDay}>{day}</div>
+                  {data.exercises.map(ex => (
+                    <div key={ex.name} style={{marginBottom:8}}>
+                      <span style={s.lastExName}>{ex.name}</span>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                        {ex.sets.map((set, i) => (
+                          <span key={i} style={s.chip}>
+                            {set.weight > 0 ? `${set.weight}kg` : "自重"}×{set.reps}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -130,11 +130,13 @@
 
       const initExercises = () => {
         if (existingLog) return existingLog.exercises;
-        const pastLog = Object.values(allLogs)
-          .filter(l => l.day === day)
-          .slice(-1)[0];
+        const pastEntry = Object.entries(allLogs)
+          .sort(([a],[b]) => a.localeCompare(b))
+          .reverse()
+          .map(([date, dayLogs]) => dayLogs[day])
+          .find(d => d);
         return presets.map(p => {
-          const pastEx = pastLog?.exercises.find(e => e.name === p.name);
+          const pastEx = pastEntry?.exercises.find(e => e.name === p.name);
           const lastSet = pastEx?.sets[pastEx.sets.length - 1];
           return {
             name: p.name,
@@ -310,29 +312,30 @@
             <div style={{textAlign:"center",color:"#555",marginTop:60,fontSize:15}}>まだ記録がありません</div>
           ) : (
             <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:12}}>
-              {dates.map(date => {
-                const log = logs[date];
-                return (
-                  <div key={date} style={s.historyCard}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,paddingBottom:10,borderBottom:"1px solid #1e1e1e"}}>
-                      <span style={{fontSize:15,fontWeight:700}}>{log.day}</span>
-                      <span style={{fontSize:12,color:"#666"}}>{formatDate(date)}</span>
-                    </div>
-                    {log.exercises.map(ex => (
-                      <div key={ex.name} style={{marginBottom:10}}>
-                        <div style={{fontSize:12,color:"#888",marginBottom:4}}>{ex.name}</div>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                          {ex.sets.map((set, i) => (
-                            <span key={i} style={s.chip}>
-                              {set.weight > 0 ? `${set.weight}kg` : "自重"}×{set.reps}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+              {dates.map(date => (
+                <div key={date} style={s.historyCard}>
+                  <div style={{fontSize:12,color:"#666",marginBottom:12,paddingBottom:10,borderBottom:"1px solid #1e1e1e"}}>
+                    {formatDate(date)}
                   </div>
-                );
-              })}
+                  {Object.entries(logs[date]).map(([day, data]) => (
+                    <div key={day} style={{marginBottom:14}}>
+                      <div style={{fontSize:14,fontWeight:700,marginBottom:8,color:"#e8ff00"}}>{day}</div>
+                      {data.exercises.map(ex => (
+                        <div key={ex.name} style={{marginBottom:8}}>
+                          <div style={{fontSize:12,color:"#888",marginBottom:4}}>{ex.name}</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                            {ex.sets.map((set, i) => (
+                              <span key={i} style={s.chip}>
+                                {set.weight > 0 ? `${set.weight}kg` : "自重"}×{set.reps}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -367,21 +370,29 @@
 
       const handleSave = (sessionData) => {
         const today = getTodayKey();
-        saveLogs({ ...logs, [today]: sessionData });
+        const todayLogs = logs[today] || {};
+        const newLogs = {
+          ...logs,
+          [today]: {
+            ...todayLogs,
+            [sessionData.day]: { exercises: sessionData.exercises }
+          }
+        };
+        saveLogs(newLogs);
       };
 
-      const todayLog = logs[getTodayKey()];
+      const todayLogs = logs[getTodayKey()] || {};
 
       return (
         <div style={{fontFamily:"'Helvetica Neue',Arial,sans-serif",background:"#0a0a0a",minHeight:"100vh",color:"#f0f0f0",maxWidth:430,margin:"0 auto"}}>
           {screen === "home" && (
-            <HomeScreen logs={logs} onStart={handleStart} onViewHistory={() => setScreen("history")} />
+            <HomeScreen logs={logs} todayLogs={todayLogs} onStart={handleStart} onViewHistory={() => setScreen("history")} />
           )}
           {screen === "session" && (
             <SessionScreen
               day={selectedDay}
               existingLog={null}
-              hasToday={!!todayLog}
+              hasToday={!!todayLogs[selectedDay]}
               allLogs={logs}
               onSave={handleSave}
               onBack={() => setScreen("home")}
