@@ -349,34 +349,19 @@
       const [selectedDay, setSelectedDay] = useState(null);
       const [editingToday, setEditingToday] = useState(false);
       const [logs, setLogs] = useState({});
-      const [fileLoaded, setFileLoaded] = useState(false);
+
+      useEffect(() => {
+        try {
+          const raw = localStorage.getItem("training-logs");
+          if (raw) setLogs(JSON.parse(raw));
+        } catch {}
+      }, []);
 
       const saveLogs = (newLogs) => {
         setLogs(newLogs);
-        // 自動でJSONダウンロード
-        const blob = new Blob([JSON.stringify(newLogs, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "training-log.json";
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-
-      const loadFile = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          try {
-            const data = JSON.parse(ev.target.result);
-            setLogs(data);
-            setFileLoaded(true);
-          } catch {
-            alert("ファイルの読み込みに失敗しました");
-          }
-        };
-        reader.readAsText(file);
+        try {
+          localStorage.setItem("training-logs", JSON.stringify(newLogs));
+        } catch {}
       };
 
       const handleStart = (day, editing) => {
@@ -394,26 +379,7 @@
 
       return (
         <div style={{fontFamily:"'Helvetica Neue',Arial,sans-serif",background:"#0a0a0a",minHeight:"100vh",color:"#f0f0f0",maxWidth:430,margin:"0 auto"}}>
-          {screen === "home" && !fileLoaded && (
-            <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:24}}>
-              <div style={{fontSize:11,letterSpacing:"0.25em",color:"#e8ff00",fontWeight:700}}>TRAINING LOG</div>
-              <div style={{fontSize:22,fontWeight:800,textAlign:"center"}}>ようこそ</div>
-              <div style={{fontSize:13,color:"#666",textAlign:"center",lineHeight:1.7}}>
-                前回のデータがある場合は<br/>JSONファイルを読み込んでください
-              </div>
-              <label style={{background:"#e8ff00",borderRadius:10,padding:"14px 28px",fontSize:14,fontWeight:700,color:"#000",cursor:"pointer",display:"block"}}>
-                📂 データを読み込む
-                <input type="file" accept=".json" onChange={loadFile} style={{display:"none"}} />
-              </label>
-              <button
-                style={{background:"transparent",border:"1px solid #2a2a2a",borderRadius:10,padding:"14px 28px",fontSize:14,color:"#666",cursor:"pointer"}}
-                onClick={() => setFileLoaded(true)}
-              >
-                新規スタート
-              </button>
-            </div>
-          )}
-          {screen === "home" && fileLoaded && (
+          {screen === "home" && (
             <HomeScreen logs={logs} onStart={handleStart} onViewHistory={() => setScreen("history")} />
           )}
           {screen === "session" && (
