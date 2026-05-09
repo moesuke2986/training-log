@@ -73,7 +73,7 @@
         <div style={s.screen}>
           <div style={s.hero}>
             <div style={s.heroLabel}>TRAINING LOG</div>
-            <div style={{fontSize:10,color:"#555",marginTop:4}}>v0.5.0</div>
+            <div style={{fontSize:10,color:"#555",marginTop:4}}>v0.5.2</div>
             <div style={s.heroDate}>{formatDate(today)}</div>
           </div>
 
@@ -137,12 +137,12 @@
           .find(d => d);
         return presets.map(p => {
           const pastEx = pastEntry?.exercises.find(e => e.name === p.name);
-          const lastSet = pastEx?.sets[pastEx.sets.length - 1];
+          const firstSet = pastEx?.sets[0];
           return {
             name: p.name,
             targetSets: p.targetSets,
             prevSets: pastEx ? pastEx.sets : null,
-            sets: [{ weight: lastSet?.weight ?? p.defaultWeight, reps: lastSet?.reps ?? p.defaultReps }],
+            sets: [{ weight: firstSet?.weight ?? p.defaultWeight, reps: firstSet?.reps ?? p.defaultReps }],
           };
         });
       };
@@ -162,8 +162,14 @@
       const addSet = (exIdx) => {
         setExercises(prev => {
           const next = prev.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }));
-          const last = next[exIdx].sets[next[exIdx].sets.length - 1];
-          next[exIdx].sets.push({ ...last });
+          const ex = next[exIdx];
+          const nextSetIdx = ex.sets.length; // 追加後のセットのインデックス
+          const prevSet = ex.prevSets?.[nextSetIdx]; // 前回の該当セット
+          const lastSet = ex.sets[ex.sets.length - 1]; // 直前のセット
+          const newSet = prevSet
+            ? { weight: prevSet.weight, reps: prevSet.reps }
+            : { ...lastSet };
+          ex.sets.push(newSet);
           return next;
         });
       };
