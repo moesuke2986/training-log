@@ -74,33 +74,18 @@
         <div style={s.screen}>
           <div style={s.hero}>
             <div style={s.heroLabel}>TRAINING LOG</div>
-            <div style={{fontSize:10,color:"#555",marginTop:4}}>v0.3.0</div>
+            <div style={{fontSize:10,color:"#555",marginTop:4}}>v0.4.0</div>
             <div style={s.heroDate}>{formatDate(today)}</div>
           </div>
 
-          {todayLog && (
-            <div style={s.todayCard}>
-              <div style={s.todayCardLabel}>今日のセッション記録済み</div>
-              <div style={s.todayCardDay}>{todayLog.day}</div>
-              <div style={s.todayCardStats}>
-                {todayLog.exercises.length}種目 · {todayLog.exercises.reduce((a,e) => a+e.sets.length, 0)}セット
-              </div>
-              <button style={s.btnSecondary} onClick={() => onStart(todayLog.day, true)}>
-                今日の記録を編集
+              <div style={s.dayGrid}>
+            {Object.keys(PRESET_MENUS).map(day => (
+              <button key={day} style={s.dayBtn} onClick={() => onStart(day)}>
+                <span>{day}</span>
+                <span style={{color:"#e8ff00"}}>→</span>
               </button>
-            </div>
-          )}
-
-          {!todayLog && (
-            <div style={s.dayGrid}>
-              {Object.keys(PRESET_MENUS).map(day => (
-                <button key={day} style={s.dayBtn} onClick={() => onStart(day, false)}>
-                  <span>{day}</span>
-                  <span style={{color:"#e8ff00"}}>→</span>
-                </button>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
 
           {lastSession && (
             <div style={s.lastSession}>
@@ -133,7 +118,7 @@
 
     // ── SESSION ───────────────────────────────────────────────────────────────
 
-    function SessionScreen({ day, existingLog, allLogs, onSave, onBack }) {
+    function SessionScreen({ day, existingLog, hasToday, allLogs, onSave, onBack }) {
       const presets = PRESET_MENUS[day];
 
       const initExercises = () => {
@@ -183,6 +168,9 @@
       };
 
       const handleSave = () => {
+        if (hasToday && !existingLog) {
+          if (!window.confirm("今日すでに記録があります。上書きして記録しますか？")) return;
+        }
         onSave({ day, exercises });
         setSaved(true);
         setTimeout(() => {
@@ -349,7 +337,6 @@
     function App() {
       const [screen, setScreen] = useState("home");
       const [selectedDay, setSelectedDay] = useState(null);
-      const [editingToday, setEditingToday] = useState(false);
       const [logs, setLogs] = useState({});
 
       useEffect(() => {
@@ -366,9 +353,8 @@
         } catch {}
       };
 
-      const handleStart = (day, editing) => {
+      const handleStart = (day) => {
         setSelectedDay(day);
-        setEditingToday(editing);
         setScreen("session");
       };
 
@@ -387,7 +373,8 @@
           {screen === "session" && (
             <SessionScreen
               day={selectedDay}
-              existingLog={editingToday ? todayLog : null}
+              existingLog={null}
+              hasToday={!!todayLog}
               allLogs={logs}
               onSave={handleSave}
               onBack={() => setScreen("home")}
